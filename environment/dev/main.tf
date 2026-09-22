@@ -15,7 +15,7 @@ module "SUBNET" {
 }
 
 module "PUBLICIP" {
-  source     = "../../modules/azurerm_pip"
+  source     = "../../modules/azurerm_public_ip"
   public_ipm = var.public_ipp
   depends_on = [module.RG]
 }
