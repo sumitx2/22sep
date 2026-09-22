@@ -25,9 +25,3 @@ module "VM" {
   vmm        = var.vmp
   depends_on = [module.SUBNET, module.PUBLICIP]
 }
-
-module "Azure_Bastion" {
-  source     = "../../Modules/azurerm_bastion"
-  bastionM   = var.bastionP
-  depends_on = [module.SUBNET, module.PUBLICIP]
-}

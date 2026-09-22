@@ -18,7 +18,7 @@ resource "azurerm_linux_virtual_machine" "example" {
   name                = each.value.vm_name
   resource_group_name = each.value.resource_group_name
   location            = each.value.location
-  size                = "Standard_D2s_v3"
+  size                = "Standard_B2ats_v2"
   admin_username      = "rajpoot1992"
   admin_password      = "rajpoot@1992"
   disable_password_authentication = false

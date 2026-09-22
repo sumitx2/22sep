@@ -28,7 +28,7 @@ subnetsp = {
     address_prefixes     = ["192.168.1.0/24"]
   }
   subnet3 = {
-    name                 = "AzureBastionSubnet"
+    name                 = "database_subnet"
     resource_group_name  = "gopu1"
     virtual_network_name = "vnet1"
     address_prefixes     = ["192.168.3.0/24"]
@@ -37,7 +37,19 @@ subnetsp = {
 
 public_ipp = {
   pip1 = {
-    public_ip_name      = "BastionPIP"
+    public_ip_name      = "frontendPIP"
+    resource_group_name = "gopu1"
+    location            = "centralindia"
+    allocation_method   = "Static"
+  }
+   pip2 = {
+    public_ip_name      = "backendPIP"
+    resource_group_name = "gopu1"
+    location            = "centralindia"
+    allocation_method   = "Static"
+  }
+  pip3 = {
+    public_ip_name      = "databasePIP"
     resource_group_name = "gopu1"
     location            = "centralindia"
     allocation_method   = "Static"
@@ -63,17 +75,15 @@ vmp = {
     subnet_name          = "backend_subnet"
     virtual_network_name = "vnet1"
   }
-
-}
-
-bastionP = {
-  bastion1={
-  name                 = "My_bastion"
-  location             = "Centralindia"
-  resource_group_name  = "gopu1"
-  subnet_name          = "AzureBastionSubnet"
-  virtual_network_name = "vnet1"
-  public_ip_name       = "BastionPIP"
+  vm3 = {
+    vm_name              = "databaseVM"
+    nic_name             = "Nic3"
+    location             = "centralindia"
+    resource_group_name  = "gopu1"
+    subnet_name          = "database_subnet"
+    virtual_network_name = "vnet1"
   }
+
 }
+
 
