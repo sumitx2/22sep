@@ -1,3 +1,29 @@
+resource "azurerm_network_security_group" "nsg" {
+    for_each = var.vmm
+  name                = each.value.nsg_name
+  location            = each.value.location
+  resource_group_name = each.value.resource_group_name
+
+  security_rule {
+    name                       = "allowssh"
+    priority                   = 100
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "22"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+}
+
+resource "azurerm_network_interface_security_group_association" "nic-nsg" {
+  for_each = var.vmm
+  network_interface_id      = azurerm_network_interface.NIC[each.key].id
+  network_security_group_id = azurerm_network_security_group.nsg[each.key].id
+}
+
+
 resource "azurerm_network_interface" "NIC" {
     for_each = var.vmm
   name                = each.value.nic_name
@@ -7,6 +33,7 @@ resource "azurerm_network_interface" "NIC" {
   ip_configuration {
     name                          = "internal"
     subnet_id                     = data.azurerm_subnet.subnet[each.key].id
+    public_ip_address_id = data.azurerm_public_ip.pip[each.key].id
     private_ip_address_allocation = "Dynamic"
   }
 }

@@ -65,6 +65,8 @@ vmp = {
     resource_group_name  = "gopu1"
     subnet_name          = "frontend_subnet"
     virtual_network_name = "vnet1"
+    publicIP_name = "frontendPIP"
+    nsg_name ="nsg1"
 
   }
   vm2 = {
@@ -74,6 +76,8 @@ vmp = {
     resource_group_name  = "gopu1"
     subnet_name          = "backend_subnet"
     virtual_network_name = "vnet1"
+    publicIP_name = "backendPIP"
+    nsg_name ="nsg2"
   }
   vm3 = {
     vm_name              = "databaseVM"
@@ -82,6 +86,8 @@ vmp = {
     resource_group_name  = "gopu1"
     subnet_name          = "database_subnet"
     virtual_network_name = "vnet1"
+    publicIP_name = "databasePIP"
+    nsg_name ="nsg3"
   }
 
 }
