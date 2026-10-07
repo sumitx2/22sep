@@ -1,0 +1,238 @@
+pool: vistara-agent
+
+trigger:
+- main
+- feature/*
+
+variables:
+  workDirectory: '$(System.DefaultWorkingDirectory)/Environments/dev'
+  serviceConnection: 'GTAServiceConnection'
+  storageAccount: 'adostorage23'
+  container: 'gopu-backend'
+  stateKey: 'gp.terraform.tfstate'
+
+parameters:
+  - name: 
+
+stages:
+
+  - stage: Scan
+    jobs:
+      - job: tflint
+        steps:
+        - task: PowerShell@2
+          displayName: 'Run TFLint'
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "Checking if tflint is installed..."
+
+              $tflint = Get-Command tflint -ErrorAction SilentlyContinue
+
+              if ($null -eq $tflint) {
+                  Write-Host "tflint is not installed. Installing tflint..."
+
+                  $version = "0.59.1"
+                  $zipUrl = "https://github.com/terraform-linters/tflint/releases/download/v$version/tflint_windows_amd64.zip"
+                  $zipPath = "$(Agent.TempDirectory)\tflint.zip"
+                  $installDir = "$(Agent.TempDirectory)\tflint"
+
+                  New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+                  Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+
+                  Expand-Archive -Path $zipPath -DestinationPath $installDir -Force
+
+                  $env:PATH = "$installDir;$env:PATH"
+
+                  Write-Host "tflint installed successfully."
+                  Write-Host "tflint version:"
+                  & "$installDir\tflint.exe" --version
+              }
+              else {
+                  Write-Host "tflint is already installed."
+                  Write-Host "Location: $($tflint.Source)"
+
+                  tflint --version
+              }
+
+              Write-Host "Running tflint..."
+
+              tflint --init
+              tflint
+
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Error "tflint scan failed."
+                  exit $LASTEXITCODE
+              }
+
+              Write-Host "tflint scan completed successfully."
+      - job: tfsec
+        steps:
+        - task: PowerShell@2
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "Checking if tfsec is installed..."
+
+              $tfsec = Get-Command tfsec -ErrorAction SilentlyContinue
+
+              if ($null -eq $tfsec) {
+                  Write-Host "tfsec is not installed. Installing tfsec..."
+
+                  $version = "1.28.14"
+                  $url = "https://github.com/aquasecurity/tfsec/releases/download/v$version/tfsec-windows-amd64.exe"
+                  $installPath = "$(Agent.TempDirectory)\tfsec.exe"
+
+                  Invoke-WebRequest -Uri $url -OutFile $installPath
+
+                  Write-Host "tfsec downloaded to: $installPath"
+
+                  # Add location to PATH for this task
+                  $env:PATH = "$(Agent.TempDirectory);$env:PATH"
+
+                  Write-Host "tfsec version:"
+                  & $installPath --version
+              }
+              else {
+                  Write-Host "tfsec is already installed."
+                  Write-Host "Location: $($tfsec.Source)"
+                  tfsec --version
+              }
+
+              Write-Host "Running tfsec scan..."
+
+              tfsec .
+
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Error "tfsec scan failed."
+                  exit $LASTEXITCODE
+              }
+
+              Write-Host "tfsec scan completed successfully."
+      - job: trufflehog
+        steps:
+        - task: PowerShell@2
+          displayName: 'Run Trufflehog'
+          continueOnError: true
+          inputs:
+            targetType: 'inline'
+            script: |
+              Write-Host "Checking if TruffleHog is installed..."
+
+                $trufflehog = Get-Command trufflehog -ErrorAction SilentlyContinue
+
+                if ($null -eq $trufflehog) {
+                    Write-Host "TruffleHog is not installed. Installing..."
+
+                    $version = "3.90.8"
+                    $zipUrl = "https://github.com/trufflesecurity/trufflehog/releases/download/v$version/trufflehog_${version}_windows_amd64.tar.gz"
+
+                    $archivePath = "$(Agent.TempDirectory)\trufflehog.tar.gz"
+                    $installDir = "$(Agent.TempDirectory)\trufflehog"
+
+                    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+
+                    Invoke-WebRequest -Uri $zipUrl -OutFile $archivePath
+
+                    # Extract .tar.gz
+                    tar -xzf $archivePath -C $installDir
+
+                    $env:PATH = "$installDir;$env:PATH"
+
+                    Write-Host "TruffleHog installed successfully."
+                }
+                else {
+                    Write-Host "TruffleHog is already installed."
+                    Write-Host "Location: $($trufflehog.Source)"
+                }
+
+                Write-Host "TruffleHog version:"
+                trufflehog --version
+
+                Write-Host "Running TruffleHog scan..."
+
+                trufflehog filesystem . --fail
+
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Error "TruffleHog found secrets or the scan failed."
+                    exit $LASTEXITCODE
+                }
+
+
+  - stage: Validate
+    displayName: Validate
+    jobs:
+      - job: initValidate
+        steps:
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: $(workDirectory)
+            backendServiceArm: $(serviceConnection)
+            backendAzureRmStorageAccountName: $(storageAccount)
+            backendAzureRmContainerName: $(container)
+            backendAzureRmKey: $(stateKey)
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'validate'
+            workingDirectory: $(workDirectory)
+
+  - stage: Plan
+    dependsOn: Validate
+    displayName: Plan
+    jobs: 
+      - job: initPlan
+        steps:
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: $(workDirectory)
+            backendServiceArm: $(serviceConnection)
+            backendAzureRmStorageAccountName: $(storageAccount)
+            backendAzureRmContainerName: $(container)
+            backendAzureRmKey: $(stateKey)
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: $(workDirectory)
+            environmentServiceNameAzureRM: $(serviceConnection)
+
+  # - stage: Approval
+  #   dependsOn: Plan
+  #   jobs:
+  #     - job: 
+  #       pool: server
+  #       steps:
+  #       - task: ManualValidation@1
+  #         inputs:
+  #           notifyUsers: 'abc@gmail.com'
+
+  # - stage: Apply
+  #   displayName: Apply
+  #   condition: 
+  #   dependsOn: Approval
+  #   jobs: 
+  #     - job: initApply
+  #       steps:
+  #       - task: TerraformTask@5
+  #         inputs:
+  #           provider: 'azurerm'
+  #           command: 'init'
+  #           workingDirectory: $(workDirectory)
+  #           backendServiceArm: $(serviceConnection)
+  #           backendAzureRmStorageAccountName: $(storageAccount)
+  #           backendAzureRmContainerName: $(container)
+  #           backendAzureRmKey: $(stateKey)
+  #       - task: TerraformTask@5
+  #         inputs:
+  #           provider: 'azurerm'
+  #           command: 'apply'
+  #           workingDirectory: $(workDirectory)
+  #           environmentServiceNameAzureRM: $(serviceConnection)
